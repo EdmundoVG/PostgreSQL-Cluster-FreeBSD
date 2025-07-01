@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>PostgreSQL Cluster Dashboard - Monitoreo y Auditoría</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh; color: white; 
+        }
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { 
+            font-size: 2.8em; margin-bottom: 15px; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3); 
+        }
+        .subtitle { font-size: 1.2em; opacity: 0.9; margin-bottom: 15px; }
+        .status-badge { 
+            display: inline-block; background: rgba(76, 175, 80, 0.8); 
+            padding: 8px 16px; border-radius: 20px; font-size: 0.9em; 
+            margin: 0 5px; font-weight: bold;
+        }
+        .dashboard-section { 
+            background: rgba(255, 255, 255, 0.15); 
+            border-radius: 15px; padding: 25px; margin: 20px 0; 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .section-title { 
+            font-size: 1.6em; margin-bottom: 20px; text-align: center; 
+            color: #FFD700; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); 
+        }
+        
+        /* Grid de servidores */
+        .servers-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
+            gap: 20px; margin-bottom: 20px; 
+        }
+        .server-card { 
+            background: rgba(255, 255, 255, 0.2); 
+            border-radius: 12px; padding: 20px; 
+            transition: transform 0.3s ease; 
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .server-card:hover { transform: translateY(-5px); }
+        .server-header { display: flex; align-items: center; margin-bottom: 15px; }
+        .server-status { width: 12px; height: 12px; border-radius: 50%; margin-right: 10px; }
+        .status-online { background-color: #4CAF50; }
+        .status-warning { background-color: #FF9800; }
+        .status-error { background-color: #f44336; }
+        .server-name { font-size: 1.2em; font-weight: bold; }
+        .server-role { 
+            margin-left: auto; padding: 4px 12px; border-radius: 15px; 
+            font-size: 0.8em; font-weight: bold; color: white;
+        }
+        .role-master { background-color: #e74c3c; }
+        .role-slave { background-color: #3498db; }
+        
+        /* Métricas del servidor */
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .metric { text-align: center; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px; }
+        .metric-value { font-size: 1.3em; font-weight: bold; margin-bottom: 3px; }
+        .metric-label { font-size: 0.8em; opacity: 0.8; }
+        
+        /* Estadísticas de auditoría */
+        .audit-stats { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 15px; margin: 20px 0; 
+        }
+        .audit-card { 
+            background: rgba(255, 255, 255, 0.2); 
+            border-radius: 10px; padding: 20px; text-align: center; 
+        }
+        .audit-number { font-size: 2.2em; font-weight: bold; margin-bottom: 8px; }
+        .audit-label { font-size: 1em; opacity: 0.9; }
+        
+        /* Eventos recientes */
+        .events-section { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; margin: 20px 0; 
+        }
+        .events-card { 
+            background: rgba(255, 255, 255, 0.15); 
+            border-radius: 10px; padding: 20px; 
+        }
+        .events-title { font-size: 1.2em; font-weight: bold; margin-bottom: 15px; }
+        .event-item { 
+            background: rgba(255, 255, 255, 0.1); 
+            padding: 8px 12px; margin: 5px 0; border-radius: 6px; 
+            font-size: 0.9em;
+        }
+        
+        /* Información del sistema */
+        .system-info { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px; 
+        }
+        .info-card { 
+            background: rgba(255, 255, 255, 0.1); 
+            padding: 15px; border-radius: 10px; 
+            border-left: 4px solid #4CAF50;
+        }
+        .info-title { font-weight: bold; margin-bottom: 8px; }
+        .info-value { font-size: 0.9em; opacity: 0.9; }
+        
+        .footer { text-align: center; margin-top: 30px; opacity: 0.8; font-size: 0.9em; }
+        .live-indicator {
+            display: inline-block; width: 8px; height: 8px;
+            background: #4CAF50; border-radius: 50%;
+            animation: blink 1.5s infinite; margin-right: 8px;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 PostgreSQL Cluster Dashboard</h1>
+            <div class="subtitle">
+                <span class="live-indicator"></span>
+                Monitoreo en Tiempo Real y Auditoría de Seguridad
+            </div>
+            <div>
+                <span class="status-badge">🏛️ 1 Master</span>
+                <span class="status-badge">🔄 2 Slaves</span>
+                <span class="status-badge">🛡️ Auditoría Activa</span>
+                <span class="status-badge">📊 Monitoreo 24/7</span>
+            </div>
+        </div>
+        
+        <!-- Estado de Servidores -->
+        <div class="dashboard-section">
+            <h2 class="section-title">🖥️ Estado de Servidores</h2>
+            <div class="servers-grid" id="serversGrid">
+                <!-- Los datos se cargarán dinámicamente -->
+            </div>
+        </div>
+        
+        <!-- Auditoría de Seguridad -->
+        <div class="dashboard-section">
+            <h2 class="section-title">🛡️ Auditoría de Seguridad JSON</h2>
+            <div class="audit-stats">
+                <div class="audit-card">
+                    <div class="audit-number" style="color: #2196F3;">3258</div>
+                    <div class="audit-label">Total Eventos</div>
+                </div>
+                <div class="audit-card">
+                    <div class="audit-number" style="color: #f44336;">0</div>
+                    <div class="audit-label">Críticos</div>
+                </div>
+                <div class="audit-card">
+                    <div class="audit-number" style="color: #FF9800;">0</div>
+                    <div class="audit-label">Advertencias</div>
+                </div>
+                <div class="audit-card">
+                    <div class="audit-number" style="color: #9C27B0;">0</div>
+                    <div class="audit-label">Errores</div>
+                </div>
+            </div>
+            
+            <!-- Eventos Recientes -->
+            <div class="events-section">
+                <div class="events-card">
+                    <div class="events-title">🔐 Eventos de Seguridad Recientes</div>
+                    <div class="event-item">👥 pattern_analysis_start,audit_session_complete,audit_session_complete</div>
+                    <div class="event-item">🔍 Auditoría de usuarios del sistema</div>
+                    <div class="event-item">⚙️ Verificación de procesos</div>
+                </div>
+                <div class="events-card">
+                    <div class="events-title">🗄️ Eventos de Base de Datos</div>
+                    <div class="event-item">📊 logging_configuration,database_users,database_users</div>
+                    <div class="event-item">🔗 Verificación de replicación</div>
+                    <div class="event-item">👤 Auditoría de usuarios PostgreSQL</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información del Sistema -->
+        <div class="dashboard-section">
+            <h2 class="section-title">📋 Información del Sistema</h2>
+            <div class="system-info">
+                <div class="info-card">
+                    <div class="info-title">⏰ Health Checks</div>
+                    <div class="info-value">
+                        Último: 2025-06-09 04:30:00<br>
+                        Total verificaciones:     1090<br>
+                        Frecuencia: Cada 5 minutos
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-title">📊 Métricas del Sistema</div>
+                    <div class="info-value">
+                        Archivo: /var/log/postgres_metrics.log<br>
+                        Recolección: Cada 3 minutos<br>
+                        Formato: CSV + JSON
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-title">🛡️ Auditoría de Seguridad</div>
+                    <div class="info-value">
+                        Archivo: /var/log/security_audit.json<br>
+                        Frecuencia: Cada 15 minutos<br>
+                        Formato: JSON estructurado
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-title">🔄 Replicación PostgreSQL</div>
+                    <div class="info-value">
+                        Tipo: Streaming Replication<br>
+                        Master: pg-master-01<br>
+                        Slaves: pg-slave-01, pg-slave-02
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-title">🌐 Load Balancer</div>
+                    <div class="info-value">
+                        IP: 141.148.83.27<br>
+                        Escrituras: Puerto 5433<br>
+                        Lecturas: Puerto 5434
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-title">💾 Respaldos Automáticos</div>
+                    <div class="info-value">
+                        Completos: Diarios 2:00 AM<br>
+                        Incrementales: WAL Archiving<br>
+                        Retención: 7 días
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Cluster PostgreSQL FreeBSD 15.0</strong> | Oracle Cloud Infrastructure</p>
+            <p>Dashboard con auto-refresh cada 30 segundos | Última actualización: Mon Jun  9 04:32:38 UTC 2025</p>
+        </div>
+    </div>
+
+    <script>
+        function parseMetrics(metricsLine) {
+            if (!metricsLine || metricsLine === 'N/A') return null;
+            const parts = metricsLine.split(',');
+            if (parts.length < 8) return null;
+            return {
+                hostname: parts[1],
+                cpu: parts[2] || '0',
+                memory_free: parts[3] || '0',
+                disk_usage: parts[5] || '0',
+                pg_connections: parts[6] || '0',
+                pg_db_size: parts[7] || 'N/A',
+                extra_metric: parts[8] || 'N/A'
+            };
+        }
+        
+        function getServerStatus(metrics) {
+            if (!metrics) return 'error';
+            const diskUsage = parseInt(metrics.disk_usage) || 0;
+            const memoryFree = parseInt(metrics.memory_free) || 0;
+            if (diskUsage > 85 || memoryFree < 100000) return 'warning';
+            return 'online';
+        }
+        
+        function formatMemory(bytes) {
+            const gb = Math.round(bytes / 1024 / 1024);
+            return gb.toLocaleString() + ' GB';
+        }
+        
+        function createServerCard(hostname, role, metrics, auditEvents) {
+            const status = getServerStatus(metrics);
+            const displayName = hostname.replace('pg-', '').replace('-0', ' ').toUpperCase();
+            
+            let extraMetricLabel, extraMetricValue;
+            if (role === 'master') {
+                extraMetricLabel = 'Slaves';
+                extraMetricValue = metrics ? metrics.extra_metric : '0';
+            } else {
+                extraMetricLabel = 'WAL Status';
+                extraMetricValue = metrics ? (metrics.extra_metric === 'streaming' ? '✅ OK' : '⚠️ Check') : 'N/A';
+            }
+            
+            return `
+                <div class="server-card">
+                    <div class="server-header">
+                        <div class="server-status status-${status}"></div>
+                        <div class="server-name">${displayName}</div>
+                        <div class="server-role role-${role}">${role.toUpperCase()}</div>
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric">
+                            <div class="metric-value">${metrics ? metrics.cpu : '0'}%</div>
+                            <div class="metric-label">CPU</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${metrics ? formatMemory(metrics.memory_free) : 'N/A'}</div>
+                            <div class="metric-label">RAM Libre</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${metrics ? metrics.disk_usage : '0'}%</div>
+                            <div class="metric-label">Disco</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${metrics ? metrics.pg_connections : '0'}</div>
+                            <div class="metric-label">Conexiones PG</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${metrics ? metrics.pg_db_size : 'N/A'}</div>
+                            <div class="metric-label">BD Size</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">${extraMetricValue}</div>
+                            <div class="metric-label">${extraMetricLabel}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 6px; font-size: 0.8em;">
+                        🛡️ Eventos auditoría: <strong>${auditEvents}</strong>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function updateDashboard() {
+            // Datos del servidor
+            const masterMetrics = parseMetrics(`2025-06-09T04:30:00+0000,pg-master-01,0.2,3663339520,4951250960384,17,9,7901kB,2`);
+            const slave1Metrics = parseMetrics(`2025-06-09 04:28:00,pg-slave-01,0.1,5329760256,4949551718400,15,     1, 7901 kB,N/A`);
+            const slave2Metrics = parseMetrics(`2025-06-09T04:30:00+0000,pg-slave-02,0.1,5416202240,4949621317632,15,5,7901kB,streaming`);
+            
+            // Actualizar grid de servidores
+            const serversGrid = document.getElementById('serversGrid');
+            serversGrid.innerHTML = 
+                createServerCard('pg-master-01', 'master', masterMetrics, '1657') +
+                createServerCard('pg-slave-01', 'slave', slave1Metrics, '823') +
+                createServerCard('pg-slave-02', 'slave', slave2Metrics, '778');
+        }
+        
+        // Actualizar dashboard inmediatamente
+        updateDashboard();
+        
+        // Auto-refresh cada 30 segundos
+        setInterval(function() {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

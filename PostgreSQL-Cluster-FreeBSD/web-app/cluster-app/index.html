@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PostgreSQL Cluster Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .connection-status {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .status-online {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .status-offline {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .status-testing {
+            background: #f39c12;
+            color: white;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+        }
+
+        .panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #34495e;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .data-table th {
+            background: #34495e;
+            color: white;
+            font-weight: bold;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .results {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #cce7ff;
+            color: #0c5460;
+            border: 1px solid #b8daff;
+        }
+
+        .cluster-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .info-card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .info-card p {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .connection-status {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f4;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .api-status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2ecc71;
+        }
+
+        .api-status.error {
+            border-left-color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐘 PostgreSQL Cluster Manager</h1>
+            <p>Administración del Cluster de Alta Disponibilidad - FreeBSD</p>
+            
+            <div class="connection-status">
+                <div class="status-badge status-online">
+                    <span class="icon">✓</span> Load Balancer: 141.148.83.27
+                </div>
+                <div class="status-badge" id="write-status">
+                    <span class="icon">📝</span> Writes: Puerto 5433
+                </div>
+                <div class="status-badge" id="read-status">
+                    <span class="icon">📖</span> Reads: Puerto 5434
+                </div>
+                <div class="status-badge" id="mixed-status">
+                    <span class="icon">⚖️</span> Mixed: Puerto 5435
+                </div>
+            </div>
+
+            <div class="cluster-info">
+                <div class="info-card">
+                    <h3>Master</h3>
+                    <p>pg-master-01<br>10.0.1.16</p>
+                </div>
+                <div class="info-card">
+                    <h3>Slave-01</h3>
+                    <p>pg-slave-01<br>10.0.1.116</p>
+                </div>
+                <div class="info-card">
+                    <h3>Slave-02</h3>
+                    <p>pg-slave-02<br>10.0.1.25</p>
+                </div>
+            </div>
+
+            <!-- Estado de APIs -->
+            <div class="api-status" id="api-status">
+                <strong>🔌 Estado APIs:</strong> <span id="api-status-text">Verificando conexión...</span>
+            </div>
+
+            <!-- Navegación entre aplicaciones -->
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="http://150.136.225.30:8080" target="_blank" class="btn" style="text-decoration: none; margin: 0 10px;">
+                    📊 Ver Dashboard de Monitoreo
+                </a>
+                <button class="btn btn-warning" onclick="checkApiHealth()">
+                    🔍 Verificar APIs
+                </button>
+                <button class="btn btn-warning" onclick="toggleFullscreen()">
+                    🖥️ Pantalla Completa
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Panel de Gestión de Clientes -->
+            <div class="panel">
+                <h2>👥 Gestión de Clientes</h2>
+                <form id="cliente-form">
+                    <div class="form-group">
+                        <label for="cliente-nombre">Nombre:</label>
+                        <input type="text" id="cliente-nombre" name="nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="cliente-email">Email:</label>
+                        <input type="email" id="cliente-email" name="email" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <span class="icon">➕</span> Agregar Cliente
+                    </button>
+                    <button type="button" class="btn" onclick="loadClientes()">
+                        <span class="icon">🔄</span> Actualizar Lista
+                    </button>
+                </form>
+            </div>
+
+            <!-- Panel de Gestión de Productos -->
+            <div class="panel">
+                <h2>📦 Gestión de Productos</h2>
+                <form id="producto-form">
+                    <div class="form-group">
+                        <label for="producto-nombre">Nombre:</label>
+                        <input type="text" id="producto-nombre" name="nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="producto-precio">Precio:</label>
+                        <input type="number" id="producto-precio" name="precio" step="0.01" min="0" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <span class="icon">➕</span> Agregar Producto
+                    </button>
+                    <button type="button" class="btn" onclick="loadProductos()">
+                        <span class="icon">🔄</span> Actualizar Lista
+                    </button>
+                </form>
+            </div>
+
+            <!-- Panel de Gestión de Pedidos -->
+            <div class="panel">
+                <h2>🛒 Crear Pedido</h2>
+                <form id="pedido-form">
+                    <div class="form-group">
+                        <label for="pedido-cliente">Cliente:</label>
+                        <select id="pedido-cliente" name="cliente_id" required>
+                            <option value="">Seleccionar cliente...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pedido-producto">Producto:</label>
+                        <select id="pedido-producto" name="producto_id" required>
+                            <option value="">Seleccionar producto...</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <span class="icon">🛒</span> Crear Pedido
+                    </button>
+                    <button type="button" class="btn" onclick="loadPedidos()">
+                        <span class="icon">🔄</span> Actualizar Lista
+                    </button>
+                </form>
+            </div>
+
+            <!-- Panel de Testing del Cluster -->
+            <div class="panel">
+                <h2>🔧 Testing del Cluster</h2>
+                <button type="button" class="btn" onclick="testClusterConnection()">
+                    <span class="icon">🔗</span> Test Backend Connection
+                </button>
+                <button type="button" class="btn" onclick="testLoadBalancer('write')">
+                    <span class="icon">📝</span> Test Escritura (5433)
+                </button>
+                <button type="button" class="btn" onclick="testLoadBalancer('read')">
+                    <span class="icon">📖</span> Test Lectura (5434)
+                </button>
+                <button type="button" class="btn" onclick="testLoadBalancer('mixed')">
+                    <span class="icon">⚖️</span> Test Mixto (5435)
+                </button>
+                <button type="button" class="btn btn-danger" onclick="clearResults()">
+                    <span class="icon">🗑️</span> Limpiar Resultados
+                </button>
+            </div>
+        </div>
+
+        <!-- Panel de Resultados (Ancho completo) -->
+        <div class="panel full-width">
+            <h2>📊 Datos del Sistema</h2>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Conectando al cluster PostgreSQL...</p>
+            </div>
+
+            <div id="results-container">
+                <div id="alert-container"></div>
+                
+                <!-- Tabs para diferentes vistas -->
+                <div style="margin-bottom: 20px;">
+                    <button class="btn" onclick="showTab('clientes')">Ver Clientes</button>
+                    <button class="btn" onclick="showTab('productos')">Ver Productos</button>
+                    <button class="btn" onclick="showTab('pedidos')">Ver Pedidos</button>
+                    <button class="btn" onclick="showTab('tests')">Resultados Tests</button>
+                </div>
+
+                <div id="tab-clientes" class="tab-content">
+                    <h3>Lista de Clientes</h3>
+                    <table class="data-table" id="clientes-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientes-tbody">
+                            <tr><td colspan="4">Cargando datos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="tab-productos" class="tab-content" style="display: none;">
+                    <h3>Lista de Productos</h3>
+                    <table class="data-table" id="productos-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Precio</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productos-tbody">
+                            <tr><td colspan="4">Cargando datos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="tab-pedidos" class="tab-content" style="display: none;">
+                    <h3>Lista de Pedidos</h3>
+                    <table class="data-table" id="pedidos-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Cliente</th>
+                                <th>Producto</th>
+                                <th>Precio</th>
+                                <th>Fecha</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pedidos-tbody">
+                            <tr><td colspan="6">Cargando datos...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="tab-tests" class="tab-content" style="display: none;">
+                    <h3>Resultados de Tests del Cluster</h3>
+                    <div id="test-results">
+                        <p>Ejecuta tests del cluster para ver los resultados aquí.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de conexión REAL
+        const CONFIG = {
+            // URLs reales de tu backend PHP
+            backendUrl: 'http://150.136.225.30:8082',
+            endpoints: {
+                test: '/test.php',
+                clientes: '/clientes.php',
+                productos: '/productos.php',
+                pedidos: '/pedidos.php'
+            }
+        };
+
+        // Variables globales para datos
+        let clientesData = [];
+        let productosData = [];
+        let pedidosData = [];
+
+        // Funciones de utilidad
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = message;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function showLoading(show = true) {
+            const loading = document.getElementById('loading');
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        function showTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.style.display = 'none');
+            document.getElementById(`tab-${tabName}`).style.display = 'block';
+        }
+
+        function updateApiStatus(isOnline, message) {
+            const statusDiv = document.getElementById('api-status');
+            const statusText = document.getElementById('api-status-text');
+            
+            statusDiv.className = `api-status ${isOnline ? '' : 'error'}`;
+            statusText.textContent = message;
+            
+            // Actualizar badges de conexión
+            const writeStatus = document.getElementById('write-status');
+            const readStatus = document.getElementById('read-status');
+            const mixedStatus = document.getElementById('mixed-status');
+            
+            const statusClass = isOnline ? 'status-online' : 'status-offline';
+            writeStatus.className = `status-badge ${statusClass}`;
+            readStatus.className = `status-badge ${statusClass}`;
+            mixedStatus.className = `status-badge ${statusClass}`;
+        }
+
+        // Funciones de API
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const url = `${CONFIG.backendUrl}${CONFIG.endpoints[endpoint]}`;
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+
+                if (data && method === 'POST') {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(url, options);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('API call failed:', error);
+                showAlert(`Error de conexión: ${error.message}`, 'error');
+                updateApiStatus(false, `Error: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // Verificar salud de las APIs
+        async function checkApiHealth() {
+            try {
+                showLoading(true);
+                const result = await apiCall('test');
+                
+                if (result.status === 'success') {
+                    updateApiStatus(true, `✅ APIs funcionando - Load Balancer: ${result.load_balancer}`);
+                    showAlert('🎉 Conexión a APIs exitosa', 'success');
+                } else {
+                    updateApiStatus(false, '❌ APIs no disponibles');
+                    showAlert('Error: APIs no disponibles', 'error');
+                }
+            } catch (error) {
+                updateApiStatus(false, `❌ Error: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Funciones de carga de datos REALES
+        async function loadClientes() {
+            try {
+                showLoading(true);
+                const result = await apiCall('clientes');
+                
+                if (result.status === 'success') {
+                    clientesData = result.data;
+                    updateClientesTable();
+                    updateClientesSelect();
+                    showAlert(`Clientes cargados: ${clientesData.length} registros`, 'success');
+                } else {
+                    showAlert('Error al cargar clientes', 'error');
+                }
+            } catch (error) {
+                showAlert('Error al conectar con la API de clientes', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadProductos() {
+            try {
+                showLoading(true);
+                const result = await apiCall('productos');
+                
+                if (result.status === 'success') {
+                    productosData = result.data;
+                    updateProductosTable();
+                    updateProductosSelect();
+                    showAlert(`Productos cargados: ${productosData.length} registros`, 'success');
+                } else {
+                    showAlert('Error al cargar productos', 'error');
+                }
+            } catch (error) {
+                showAlert('Error al conectar con la API de productos', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadPedidos() {
+            try {
+                showLoading(true);
+                const result = await apiCall('pedidos');
+                
+                if (result.status === 'success') {
+                    pedidosData = result.data;
+                    updatePedidosTable();
+                    showAlert(`Pedidos cargados: ${pedidosData.length} registros`, 'success');
+                } else {
+                    showAlert('Error al cargar pedidos', 'error');
+                }
+            } catch (error) {
+                showAlert('Error al conectar con la API de pedidos', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Funciones de actualización de tablas
+        function updateClientesTable() {
+            const tbody = document.getElementById('clientes-tbody');
+            tbody.innerHTML = '';
+            
+            if (clientesData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">No hay clientes registrados</td></tr>';
+                return;
+            }
+            
+            clientesData.forEach(cliente => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${cliente.id}</td>
+                    <td>${cliente.nombre}</td>
+                    <td>${cliente.email}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteCliente(${cliente.id})" style="padding: 5px 10px; font-size: 12px;">
+                            Eliminar
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        function updateProductosTable() {
+            const tbody = document.getElementById('productos-tbody');
+            tbody.innerHTML = '';
+            
+            if (productosData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">No hay productos registrados</td></tr>';
+                return;
+            }
+            
+            productosData.forEach(producto => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${producto.id}</td>
+                    <td>${producto.nombre}</td>
+                    <td>${parseFloat(producto.precio).toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-warning" onclick="updateProducto(${producto.id})" style="padding: 5px 10px; font-size: 12px;">
+                            Update Precio
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        function updatePedidosTable() {
+            const tbody = document.getElementById('pedidos-tbody');
+            tbody.innerHTML = '';
+            
+            if (pedidosData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No hay pedidos registrados</td></tr>';
+                return;
+            }
+            
+            pedidosData.forEach(pedido => {
+                const row = tbody.insertRow();
+                // Formatear fecha correctamente
+                const fecha = new Date(pedido.fecha);
+                const fechaFormateada = isNaN(fecha.getTime()) ? pedido.fecha : fecha.toLocaleString('es-ES', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                
+                row.innerHTML = `
+                    <td>${pedido.id}</td>
+                    <td>${pedido.cliente}</td>
+                    <td>${pedido.producto}</td>
+                    <td>${parseFloat(pedido.precio).toFixed(2)}</td>
+                    <td>${fechaFormateada}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deletePedido(${pedido.id})" style="padding: 5px 10px; font-size: 12px;">
+                            Eliminar
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        function updateClientesSelect() {
+            const select = document.getElementById('pedido-cliente');
+            select.innerHTML = '<option value="">Seleccionar cliente...</option>';
+            
+            clientesData.forEach(cliente => {
+                const option = document.createElement('option');
+                option.value = cliente.id;
+                option.textContent = cliente.nombre;
+                select.appendChild(option);
+            });
+        }
+
+        function updateProductosSelect() {
+            const select = document.getElementById('pedido-producto');
+            select.innerHTML = '<option value="">Seleccionar producto...</option>';
+            
+            productosData.forEach(producto => {
+                const option = document.createElement('option');
+                option.value = producto.id;
+                option.textContent = `${producto.nombre} - ${parseFloat(producto.precio).toFixed(2)}`;
+                select.appendChild(option);
+            });
+        }
+
+        // Funciones de CRUD
+async function deleteCliente(id) {
+    if (!confirm('¿Estás seguro de eliminar este cliente?')) return;
+    
+    try {
+        const result = await apiCall('clientes', 'POST', { action: 'delete', id: id });
+        if (result.status === 'success') {
+            showAlert('Cliente eliminado exitosamente', 'success');
+            loadClientes();
+            loadPedidos();
+        } else {
+            showAlert('Error al eliminar cliente', 'error');
+        }
+    } catch (error) {
+        console.error('Error eliminando cliente:', error);
+        showAlert('Error al eliminar cliente', 'error');
+    }
+}
+
+        async function deletePedido(id) {
+            if (!confirm('¿Estás seguro de eliminar este pedido?')) return;
+            
+            try {
+                const result = await apiCall('pedidos', 'POST', { action: 'delete', id: id });
+                if (result.status === 'success') {
+                    showAlert('Pedido eliminado exitosamente', 'success');
+                    loadPedidos();
+                } else {
+                    showAlert('Error al eliminar pedido', 'error');
+                }
+            } catch (error) {
+                showAlert('Error de conexión al eliminar pedido', 'error');
+            }
+        }
+
+async function updateProducto(id) {
+    const nuevoPrecio = prompt('Ingresa el nuevo precio:');
+    if (!nuevoPrecio || isNaN(nuevoPrecio)) {
+        showAlert('Precio inválido', 'error');
+        return;
+    }
+    
+    try {
+        const result = await apiCall('productos', 'POST', { 
+            action: 'update', 
+            id: id, 
+            precio: parseFloat(nuevoPrecio).toFixed(2)
+        });
+        
+        if (result.status === 'success') {
+            showAlert('Precio actualizado exitosamente', 'success');
+            loadProductos();
+        } else {
+            showAlert(`Error: ${result.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error actualizando precio:', error);
+        showAlert('Error al actualizar precio', 'error');
+    }
+}
+
+
+        // Funciones de testing del cluster REALES
+        async function testClusterConnection() {
+            try {
+                showLoading(true);
+                const result = await apiCall('test');
+                
+                const testResults = document.getElementById('test-results');
+                if (result.status === 'success') {
+                    const resultHtml = `
+                        <div class="alert alert-success">
+                            <strong>✅ Test de Conexión Backend Exitoso</strong><br>
+                            <strong>Load Balancer:</strong> ${result.load_balancer}<br>
+                            <strong>Write Test:</strong> Servidor ${result.write_test.server} - Puerto ${result.write_test.port} - Slave: ${result.write_test.is_slave}<br>
+                            <strong>Read Test:</strong> Servidor ${result.read_test.server} - Puerto ${result.read_test.port} - Slave: ${result.read_test.is_slave}<br>
+                            <strong>Timestamp:</strong> ${result.timestamp}<br>
+                            <strong>Estado:</strong> ${result.message}
+                        </div>
+                    `;
+                    testResults.innerHTML += resultHtml;
+                    showTab('tests');
+                    showAlert('Test de conexión backend completado exitosamente', 'success');
+                } else {
+                    showAlert('Error en test de conexión backend', 'error');
+                }
+            } catch (error) {
+                const testResults = document.getElementById('test-results');
+                const errorHtml = `
+                    <div class="alert alert-error">
+                        <strong>❌ Error en Test de Conexión</strong><br>
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Timestamp:</strong> ${new Date().toLocaleString()}
+                    </div>
+                `;
+                testResults.innerHTML += errorHtml;
+                showTab('tests');
+                showAlert('Error en test de conexión backend', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function testLoadBalancer(type) {
+            try {
+                showLoading(true);
+                
+                // Hacer múltiples llamadas para mostrar balanceo
+                const tests = [];
+                for (let i = 0; i < 3; i++) {
+                    const result = await apiCall('test');
+                    tests.push(result);
+                }
+                
+                const testResults = document.getElementById('test-results');
+                const resultHtml = `
+                    <div class="alert alert-info">
+                        <strong>🔄 Test Load Balancer ${type.toUpperCase()}</strong><br>
+                        <strong>Múltiples conexiones realizadas:</strong><br>
+                        ${tests.map((test, index) => `
+                            Test ${index + 1}: Servidor ${test.write_test.server} (${test.write_test.is_slave ? 'Slave' : 'Master'})<br>
+                        `).join('')}
+                        <strong>Load Balancer:</strong> ${tests[0].load_balancer}<br>
+                        <strong>Timestamp:</strong> ${new Date().toLocaleString()}
+                    </div>
+                `;
+                
+                testResults.innerHTML += resultHtml;
+                showTab('tests');
+                showAlert(`Test de Load Balancer ${type} completado`, 'info');
+                
+            } catch (error) {
+                showAlert(`Error en test de Load Balancer ${type}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '<p>Ejecuta tests del cluster para ver los resultados aquí.</p>';
+            showAlert('Resultados limpiados', 'info');
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Event listeners para formularios
+        document.getElementById('cliente-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                showLoading(true);
+                const data = {
+                    action: 'create',
+                    nombre: formData.get('nombre'),
+                    email: formData.get('email')
+                };
+                
+                const result = await apiCall('clientes', 'POST', data);
+                
+                if (result.status === 'success') {
+                    showAlert('Cliente agregado exitosamente', 'success');
+                    e.target.reset();
+                    loadClientes();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert('Error al agregar cliente', 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        document.getElementById('producto-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                showLoading(true);
+                const data = {
+                    action: 'create',
+                    nombre: formData.get('nombre'),
+                    precio: parseFloat(formData.get('precio'))
+                };
+                
+                const result = await apiCall('productos', 'POST', data);
+                
+                if (result.status === 'success') {
+                    showAlert('Producto agregado exitosamente', 'success');
+                    e.target.reset();
+                    loadProductos();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert('Error al agregar producto', 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        document.getElementById('pedido-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                showLoading(true);
+                const data = {
+                    action: 'create',
+                    cliente_id: parseInt(formData.get('cliente_id')),
+                    producto_id: parseInt(formData.get('producto_id'))
+                };
+                
+                const result = await apiCall('pedidos', 'POST', data);
+                
+                if (result.status === 'success') {
+                    showAlert('Pedido creado exitosamente', 'success');
+                    e.target.reset();
+                    loadPedidos();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert('Error al crear pedido', 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Verificar estado inicial de APIs
+            await checkApiHealth();
+            
+            // Cargar datos iniciales
+            await loadClientes();
+            await loadProductos();
+            await loadPedidos();
+            
+            // Mostrar mensaje de bienvenida
+            showAlert('🎉 Aplicación web conectada al cluster PostgreSQL', 'success');
+        });
+
+        // Auto-refresh cada 30 segundos (opcional)
+        setInterval(async function() {
+            try {
+                await checkApiHealth();
+            } catch (error) {
+                console.log('Auto-refresh failed:', error);
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
